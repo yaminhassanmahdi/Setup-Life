@@ -1,9 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AIProposal, Priority, ProjectStatus, TaskStatus, ProjectCategory, ScheduleItem } from "../types";
 
-// Always use the environment variable as per system instructions
-const API_KEY = process.env.API_KEY;
-
 const proposalSchema: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -112,7 +109,7 @@ const proposalSchema: Schema = {
 
 export const parseBrainDump = async (text: string, referenceDate: string = new Date().toISOString().split('T')[0]): Promise<AIProposal | null> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
@@ -160,7 +157,7 @@ export const parseBrainDump = async (text: string, referenceDate: string = new D
 
 export const generateDailyPlan = async (currentTasks: any[], goals: any[]): Promise<any | null> => {
   try {
-      const ai = new GoogleGenAI({ apiKey: API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       const planSchema: Schema = {
           type: Type.OBJECT,
@@ -196,7 +193,7 @@ export const generateDailyPlan = async (currentTasks: any[], goals: any[]): Prom
 
 export const breakdownPlan = async (planTitle: string, currentHorizon: string): Promise<string[] | null> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: API_KEY });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         const schema: Schema = {
             type: Type.OBJECT,

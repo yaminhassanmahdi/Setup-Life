@@ -1,8 +1,8 @@
-
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = "https://gyggbyrulemscxdapkhr.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5Z2dieXJ1bGVtc2N4ZGFwa2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDMyNTcsImV4cCI6MjA4NTQxOTI1N30.9kMiKeF7ERiBIV394QBVPcFCru7cK-6mKyFo5mIArnI";
+// Access Environment Variables with Fallbacks for local dev/Vercel
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || "https://gyggbyrulemscxdapkhr.supabase.co";
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd5Z2dieXJ1bGVtc2N4ZGFwa2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDMyNTcsImV4cCI6MjA4NTQxOTI1N30.9kMiKeF7ERiBIV394QBVPcFCru7cK-6mKyFo5mIArnI";
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
