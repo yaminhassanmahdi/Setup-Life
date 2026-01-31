@@ -18,7 +18,7 @@ import { StrategyRoadmap } from './pages/StrategyRoadmap';
 import { Profile } from './pages/Profile'; // Import Profile
 import { Loader2 } from 'lucide-react';
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute = ({ children }: React.PropsWithChildren) => {
     const { user, isLoading, onboardingCompleted, userRole } = useApp();
     const location = useLocation();
 

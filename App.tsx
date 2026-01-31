@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext';
@@ -19,7 +18,7 @@ import { StrategyRoadmap } from './pages/StrategyRoadmap';
 import { Profile } from './pages/Profile'; // Import Profile
 import { Loader2 } from 'lucide-react';
 
-const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
+const ProtectedRoute = ({ children }: React.PropsWithChildren) => {
     const { user, isLoading, onboardingCompleted, userRole } = useApp();
     const location = useLocation();
 
@@ -37,14 +36,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
 
     // ADMIN BYPASS: Admins do not need to do onboarding
     if (userRole === 'admin') {
-        return children;
+        return <>{children}</>;
     }
 
     if (!onboardingCompleted && location.pathname !== '/onboarding') {
         return <Navigate to="/onboarding" replace />;
     }
 
-    return children;
+    return <>{children}</>;
 };
 
 const App = () => {

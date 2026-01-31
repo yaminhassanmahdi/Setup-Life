@@ -186,7 +186,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsLoading(true);
     const userId = currentUser.id;
     try {
-        const [p, t, st, g, k, h, s, wg, sp] = await Promise.all([
+        // Use allSettled to allow partial failures (e.g., if a new table like strategic_plans doesn't exist yet)
+        const results = await Promise.allSettled([
             supabase.from('projects').select('*'),
             supabase.from('tasks').select('*'),
             supabase.from('subtasks').select('*'),
@@ -198,12 +199,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             supabase.from('strategic_plans').select('*')
         ]);
 
-        if (p.error && p.error.message.includes('relation "projects" does not exist')) {
-            alert("Database Error: Tables not found. Please run the schema.sql in your Supabase SQL Editor.");
-            return;
-        }
+        // Helper to extract data or default to empty array
+        const getData = (index: number) => {
+            const res = results[index];
+            if (res.status === 'fulfilled' && res.value.data) {
+                return res.value.data;
+            }
+            if (res.status === 'rejected') {
+                console.warn(`Table fetch failed at index ${index}`, res.reason);
+            }
+            return [];
+        };
 
-        const profileData = await fetchProfileWithRetry(userId);
+        const projectsData = getData(0);
+        const tasksData = getData(1);
+        const subtasksData = getData(2);
+        const goalsData = getData(3);
+        const kpisData = getData(4);
+        const habitsData = getData(5);
+        const scheduleData = getData(6);
+        const weeklyGoalsData = getData(7);
+        const strategicPlansData = getData(8);
+
+        // Fetch Profile separately as it's critical for roles
+        let profileData = null;
+        try {
+            profileData = await fetchProfileWithRetry(userId);
+        } catch (err) {
+            console.error("Profile fetch failed (likely schema mismatch or new user)", err);
+        }
         
         if (currentUser.email === 'admin@gmail.com' && profileData?.role !== 'admin') {
             await supabase.from('profiles').update({ role: 'admin' }).eq('id', userId);
@@ -213,21 +237,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
 
         setState({
-            projects: (p.data || []).map(mapProjectFromDB),
-            tasks: (t.data || []).map(mapTaskFromDB),
-            subtasks: (st.data || []).map(mapSubtaskFromDB),
-            goals: (g.data || []).map(mapGoalFromDB),
-            kpis: (k.data || []).map(mapKPIFromDB),
-            habits: (h.data || []).map(mapHabitFromDB),
-            schedule: (s.data || []).map(mapScheduleFromDB),
-            weeklyGoals: (wg.data || []).map(mapWeeklyGoalFromDB),
-            strategicPlans: (sp.data || []).map(mapStrategicPlanFromDB),
+            projects: projectsData.map(mapProjectFromDB),
+            tasks: tasksData.map(mapTaskFromDB),
+            subtasks: subtasksData.map(mapSubtaskFromDB),
+            goals: goalsData.map(mapGoalFromDB),
+            kpis: kpisData.map(mapKPIFromDB),
+            habits: habitsData.map(mapHabitFromDB),
+            schedule: scheduleData.map(mapScheduleFromDB),
+            weeklyGoals: weeklyGoalsData.map(mapWeeklyGoalFromDB),
+            strategicPlans: strategicPlansData.map(mapStrategicPlanFromDB),
             xp: profileData?.xp || 0,
             onboardingCompleted: profileData?.onboarding_completed || false,
             achievements: profileData?.unlocked_achievements || []
         });
     } catch (e) {
-        console.error("Supabase fetch error", e);
+        console.error("Supabase fetch fatal error", e);
     } finally {
         setIsLoading(false);
     }
@@ -245,17 +269,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newXP = Math.max(0, state.xp + amount);
       setState(prev => ({ ...prev, xp: newXP }));
       if (user) {
-          await supabase.from('profiles').upsert({ id: user.id, xp: newXP });
+          // Fire and forget for UX speed
+          supabase.from('profiles').upsert({ id: user.id, xp: newXP }).then(({ error }) => {
+              if (error) console.warn("Failed to sync XP", error);
+          });
       }
-      // Check achievements after XP change (and implicitly after action)
       checkAchievements();
   }
 
   const checkAchievements = async () => {
-      // We operate on current state, but React state updates are async, so we might need a small delay or check against 'prev' in a useEffect.
-      // For simplicity, we'll assume state is mostly up to date or we pass data in.
-      // Actually, let's derive data from current state snapshot in setTimeout to let render cycle finish
-      
       setTimeout(async () => {
           let newUnlocked: string[] = [];
           const currentUnlocked = new Set(state.achievements);
@@ -276,8 +298,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               if (user) {
                   await supabase.from('profiles').update({ unlocked_achievements: updatedList }).eq('id', user.id);
               }
-              // Simple notification
-              // alert(`Achievement Unlocked: ${newUnlocked.join(', ')}`); // Removed alert to be less intrusive, assume UI handles it
           }
       }, 500);
   }
@@ -294,19 +314,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       
       const { projects, tasks, subtasks, goals, kpis, habits, schedule, weeklyGoals, strategicPlans, xp, onboardingCompleted, achievements } = state;
       
-      await Promise.all([
-          ...projects.map(x => supabase.from('projects').upsert(mapProjectToDB(x, user.id))),
-          ...tasks.map(x => supabase.from('tasks').upsert(mapTaskToDB(x, user.id))),
-          ...subtasks.map(x => supabase.from('subtasks').upsert(mapSubtaskToDB(x, user.id))),
-          ...goals.map(x => supabase.from('goals').upsert(mapGoalToDB(x, user.id))),
-          ...kpis.map(x => supabase.from('kpis').upsert(mapKPIToDB(x, user.id))),
-          ...habits.map(x => supabase.from('habits').upsert(mapHabitToDB(x, user.id))),
-          ...schedule.map(x => supabase.from('schedule').upsert(mapScheduleToDB(x, user.id))),
-          ...weeklyGoals.map(x => supabase.from('weekly_goals').upsert(mapWeeklyGoalToDB(x, user.id))),
-          ...strategicPlans.map(x => supabase.from('strategic_plans').upsert(mapStrategicPlanToDB(x, user.id))),
-          supabase.from('profiles').upsert({ id: user.id, xp, onboarding_completed: onboardingCompleted, unlocked_achievements: achievements })
-      ]);
-      alert("Sync complete!");
+      try {
+        await Promise.all([
+            ...projects.map(x => supabase.from('projects').upsert(mapProjectToDB(x, user.id))),
+            ...tasks.map(x => supabase.from('tasks').upsert(mapTaskToDB(x, user.id))),
+            ...subtasks.map(x => supabase.from('subtasks').upsert(mapSubtaskToDB(x, user.id))),
+            ...goals.map(x => supabase.from('goals').upsert(mapGoalToDB(x, user.id))),
+            ...kpis.map(x => supabase.from('kpis').upsert(mapKPIToDB(x, user.id))),
+            ...habits.map(x => supabase.from('habits').upsert(mapHabitToDB(x, user.id))),
+            ...schedule.map(x => supabase.from('schedule').upsert(mapScheduleToDB(x, user.id))),
+            ...weeklyGoals.map(x => supabase.from('weekly_goals').upsert(mapWeeklyGoalToDB(x, user.id))),
+            ...strategicPlans.map(x => supabase.from('strategic_plans').upsert(mapStrategicPlanToDB(x, user.id))),
+            supabase.from('profiles').upsert({ id: user.id, xp, onboarding_completed: onboardingCompleted, unlocked_achievements: achievements })
+        ]);
+        alert("Sync complete!");
+      } catch (e) {
+        console.error("Sync failed", e);
+        alert("Sync encountered errors. Check console.");
+      }
   }
 
   const completeOnboarding = async () => {
@@ -524,7 +549,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
          setIsLoading(true);
          try {
              // Deleting projects cascades to tasks, goals, kpis, subtasks via DB constraints
-             // Deleting other tables independently
              await Promise.all([
                 supabase.from('projects').delete().eq('user_id', user.id), 
                 supabase.from('habits').delete().eq('user_id', user.id),
@@ -549,8 +573,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const applyAIProposal = (proposal: AIProposal) => {
-    // ... (No logic changes needed here for XP, as adding individual items calls the helpers)
-    // Reuse existing logic
     const projectMap = new Map<string, string>();
 
     // 1. Projects
