@@ -3,12 +3,14 @@ import { useApp } from '../context/AppContext';
 import { Task, TaskStatus, ProjectCategory } from '../types';
 import { PlayCircle, CheckCircle2, Clock, Target, AlertCircle } from 'lucide-react';
 import { generateDailyPlan } from '../services/geminiService';
+import { useNavigate } from 'react-router-dom';
 
 export const Dashboard = () => {
-  const { tasks, projects, goals, updateTask } = useApp();
+  const { tasks, projects, goals, updateTask, userApiKey } = useApp();
   const [dailyAdvice, setDailyAdvice] = useState<string>("");
   const [focusTaskIds, setFocusTaskIds] = useState<string[]>([]);
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
+  const navigate = useNavigate();
 
   // Filter for WORK context only
   const workProjects = projects.filter(p => p.category === ProjectCategory.Work);
@@ -25,14 +27,26 @@ export const Dashboard = () => {
     .reduce((acc, t) => acc + (t.estimatedHours || 0), 0);
 
   const generatePlan = async () => {
-      setIsLoadingPlan(true);
-      const activeTasks = workTasks.filter(t => t.status !== TaskStatus.Done);
-      const plan = await generateDailyPlan(activeTasks, workGoals);
-      if (plan) {
-          setDailyAdvice(plan.advice);
-          setFocusTaskIds(plan.top3TaskIds);
+      if (!userApiKey) {
+        if(confirm("You need a Personal API Key to use AI features. Go to Settings?")) {
+            navigate('/app/settings');
+        }
+        return;
       }
-      setIsLoadingPlan(false);
+
+      setIsLoadingPlan(true);
+      try {
+        const activeTasks = workTasks.filter(t => t.status !== TaskStatus.Done);
+        const plan = await generateDailyPlan(activeTasks, workGoals, userApiKey);
+        if (plan) {
+            setDailyAdvice(plan.advice);
+            setFocusTaskIds(plan.top3TaskIds);
+        }
+      } catch(e) {
+          alert("Error generating plan. Check API Key.");
+      } finally {
+        setIsLoadingPlan(false);
+      }
   }
 
   const focusTasks = workTasks.filter(t => focusTaskIds.includes(t.id));

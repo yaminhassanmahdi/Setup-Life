@@ -10,18 +10,26 @@ export const BrainDump = () => {
   const [input, setInput] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [proposal, setProposal] = useState<AIProposal | null>(null);
-  const { applyAIProposal } = useApp();
+  const { applyAIProposal, userApiKey } = useApp();
   const navigate = useNavigate();
 
   const handleAnalyze = async () => {
     if (!input.trim()) return;
     
+    // CRITICAL: Force User API Key for daily usage
+    if (!userApiKey) {
+        if(confirm("You need a Personal API Key to continue using AI features. Go to Settings to add it?")) {
+            navigate('/app/settings');
+        }
+        return;
+    }
+
     setIsAnalyzing(true);
     try {
-      const result = await parseBrainDump(input);
+      const result = await parseBrainDump(input, new Date().toISOString().split('T')[0], userApiKey);
       setProposal(result);
     } catch (error) {
-      alert("Something went wrong with the AI analysis. Please try again.");
+      alert("Something went wrong with the AI analysis. Please check your API Key in Settings.");
     } finally {
       setIsAnalyzing(false);
     }

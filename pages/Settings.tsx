@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, LogIn, Cloud, RefreshCw, LogOut, Trash2, AlertTriangle } from 'lucide-react';
+import { Settings as SettingsIcon, LogIn, Cloud, RefreshCw, LogOut, Trash2, AlertTriangle, Key } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../services/supabase';
 
 export const Settings = () => {
-  const { user, userRole, logout, syncLocalToRemote, resetData } = useApp();
+  const { user, userRole, logout, syncLocalToRemote, resetData, userApiKey, setUserApiKey } = useApp();
   
   // Auth State
   const [email, setEmail] = useState('');
@@ -40,6 +40,28 @@ export const Settings = () => {
       <h1 className="text-3xl font-bold mb-6 flex items-center gap-2">
           <SettingsIcon className="text-muted" /> Settings
       </h1>
+
+      {/* --- API KEY SECTION --- */}
+      <div className="bg-surface border border-border rounded-xl p-6 max-w-2xl">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-primary">
+              <Key size={20} /> Personal AI Key
+          </h2>
+          <p className="text-sm text-muted mb-4">
+              To use AI features after onboarding (Brain Dump, Daily Planning, etc.), you must provide your own Google Gemini API Key.
+              <br/>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-primary hover:underline">Get a free key here.</a>
+          </p>
+          <div className="flex gap-2">
+              <input 
+                  type="password" 
+                  placeholder="Paste your Gemini API Key here..." 
+                  className="flex-1 bg-background border border-border rounded px-4 py-2 text-sm focus:border-primary focus:outline-none"
+                  value={userApiKey || ''}
+                  onChange={(e) => setUserApiKey(e.target.value)}
+              />
+          </div>
+          {userApiKey && <p className="text-xs text-green-400 mt-2">Key saved securely in your browser.</p>}
+      </div>
 
       {/* --- AUTH SECTION --- */}
       <div className="bg-surface border border-border rounded-xl p-6 max-w-2xl">

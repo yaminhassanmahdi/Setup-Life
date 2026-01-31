@@ -26,9 +26,11 @@ interface AppContextType extends AppState {
   user: User | null;
   userRole: UserRole;
   isLoading: boolean;
+  userApiKey: string | null;
+  setUserApiKey: (key: string) => void;
   logout: () => void;
   
-  completeOnboarding: () => void;
+  completeOnboarding: () => Promise<void>; // Updated to Promise
 
   addProject: (project: Project) => void;
   updateProject: (project: Project) => void;
@@ -76,6 +78,7 @@ interface AppContextType extends AppState {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'founder_focus_data_v6';
+const API_KEY_STORAGE_KEY = 'founder_focus_api_key';
 const XP_HABIT = 10;
 const XP_SCHEDULE = 20;
 const XP_TASK = 50;
@@ -127,6 +130,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('user');
   const [isLoading, setIsLoading] = useState(true);
+  const [userApiKey, setApiKeyState] = useState<string | null>(localStorage.getItem(API_KEY_STORAGE_KEY));
 
   // 1. Check Auth & Fetch Data
   useEffect(() => {
@@ -151,6 +155,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const setUserApiKey = (key: string) => {
+      setApiKeyState(key);
+      localStorage.setItem(API_KEY_STORAGE_KEY, key);
+  }
 
   // 2. Load from LocalStorage (Fallback)
   const loadLocalData = () => {
@@ -186,7 +195,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setIsLoading(true);
     const userId = currentUser.id;
     try {
-        // Use allSettled to allow partial failures (e.g., if a new table like strategic_plans doesn't exist yet)
         const results = await Promise.allSettled([
             supabase.from('projects').select('*'),
             supabase.from('tasks').select('*'),
@@ -199,7 +207,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             supabase.from('strategic_plans').select('*')
         ]);
 
-        // Helper to extract data or default to empty array
         const getData = (index: number) => {
             const res = results[index];
             if (res.status === 'fulfilled' && res.value.data) {
@@ -236,7 +243,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             setUserRole(profileData.role as UserRole);
         }
 
-        setState({
+        setState(prev => ({
             projects: projectsData.map(mapProjectFromDB),
             tasks: tasksData.map(mapTaskFromDB),
             subtasks: subtasksData.map(mapSubtaskFromDB),
@@ -246,10 +253,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             schedule: scheduleData.map(mapScheduleFromDB),
             weeklyGoals: weeklyGoalsData.map(mapWeeklyGoalFromDB),
             strategicPlans: strategicPlansData.map(mapStrategicPlanFromDB),
-            xp: profileData?.xp || 0,
-            onboardingCompleted: profileData?.onboarding_completed || false,
-            achievements: profileData?.unlocked_achievements || []
-        });
+            // Fallback to existing state if profileData is missing/failed to fetch
+            // This prevents overwriting 'true' with 'false' if the DB fetch fails
+            xp: profileData?.xp ?? prev.xp,
+            onboardingCompleted: profileData?.onboarding_completed ?? prev.onboardingCompleted,
+            achievements: profileData?.unlocked_achievements ?? prev.achievements
+        }));
     } catch (e) {
         console.error("Supabase fetch fatal error", e);
     } finally {
@@ -269,7 +278,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const newXP = Math.max(0, state.xp + amount);
       setState(prev => ({ ...prev, xp: newXP }));
       if (user) {
-          // Fire and forget for UX speed
           supabase.from('profiles').upsert({ id: user.id, xp: newXP }).then(({ error }) => {
               if (error) console.warn("Failed to sync XP", error);
           });
@@ -306,6 +314,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await supabase.auth.signOut();
       setState(generateDefaults());
       setUserRole('user');
+      localStorage.removeItem(API_KEY_STORAGE_KEY);
+      setApiKeyState(null);
   };
 
   const syncLocalToRemote = async () => {
@@ -335,9 +345,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }
 
   const completeOnboarding = async () => {
-      setState(prev => ({ ...prev, onboardingCompleted: true }));
+      // Optimistic update first to feel instant
+      setState(prev => {
+          const newState = { ...prev, onboardingCompleted: true };
+          // Force explicit save to local storage immediately to prevent race conditions on reload
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(newState));
+          return newState;
+      });
+      
       if (user) {
-          await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
+          try {
+            // Await the DB update so we don't redirect before it's saved
+            const { error } = await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
+            if (error) throw error;
+          } catch(e) {
+              console.error("Onboarding DB update failed", e);
+              // We rely on the optimistic update/local storage for now
+          }
       }
   }
 
@@ -548,14 +572,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
          
          setIsLoading(true);
          try {
-             // Deleting projects cascades to tasks, goals, kpis, subtasks via DB constraints
              await Promise.all([
                 supabase.from('projects').delete().eq('user_id', user.id), 
                 supabase.from('habits').delete().eq('user_id', user.id),
                 supabase.from('schedule').delete().eq('user_id', user.id),
                 supabase.from('weekly_goals').delete().eq('user_id', user.id),
                 supabase.from('strategic_plans').delete().eq('user_id', user.id),
-                // Reset Profile Stats
                 supabase.from('profiles').update({ xp: 0, onboarding_completed: false, unlocked_achievements: [] }).eq('id', user.id)
              ]);
          } catch(e) {
@@ -640,6 +662,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       user,
       userRole,
       isLoading,
+      userApiKey,
+      setUserApiKey,
       logout,
       syncLocalToRemote,
       completeOnboarding,

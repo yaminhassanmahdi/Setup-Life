@@ -122,11 +122,11 @@ const proposalSchema: Schema = {
   required: ["summary", "projects", "goals", "kpis", "tasks", "habits", "schedule", "weeklyGoals"],
 };
 
-export const parseBrainDump = async (text: string, referenceDate: string = new Date().toISOString().split('T')[0]): Promise<AIProposal | null> => {
+export const parseBrainDump = async (text: string, referenceDate: string = new Date().toISOString().split('T')[0], userApiKey?: string): Promise<AIProposal | null> => {
   try {
-    const apiKey = getApiKey();
+    const apiKey = userApiKey || getApiKey();
     if (!apiKey) {
-        throw new Error("Missing API Key. Please set VITE_GOOGLE_API_KEY in your environment variables.");
+        throw new Error("Missing API Key. Please set your Personal API Key in Settings.");
     }
     const ai = new GoogleGenAI({ apiKey });
 
@@ -174,9 +174,9 @@ export const parseBrainDump = async (text: string, referenceDate: string = new D
   }
 };
 
-export const generateDailyPlan = async (currentTasks: any[], goals: any[]): Promise<any | null> => {
+export const generateDailyPlan = async (currentTasks: any[], goals: any[], userApiKey?: string): Promise<any | null> => {
   try {
-      const apiKey = getApiKey();
+      const apiKey = userApiKey || getApiKey();
       if (!apiKey) throw new Error("Missing API Key");
       const ai = new GoogleGenAI({ apiKey });
       
@@ -212,9 +212,9 @@ export const generateDailyPlan = async (currentTasks: any[], goals: any[]): Prom
   }
 }
 
-export const breakdownPlan = async (planTitle: string, currentHorizon: string): Promise<string[] | null> => {
+export const breakdownPlan = async (planTitle: string, currentHorizon: string, userApiKey?: string): Promise<string[] | null> => {
     try {
-        const apiKey = getApiKey();
+        const apiKey = userApiKey || getApiKey();
         if (!apiKey) throw new Error("Missing API Key");
         const ai = new GoogleGenAI({ apiKey });
 

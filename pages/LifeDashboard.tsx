@@ -1,18 +1,19 @@
-
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { ScheduleItem, AIProposal, ProjectCategory, TimeOfDay, Habit } from '../types';
 import { Sun, CheckCircle2, Clock, Calendar, Plus, Trash2, ArrowRight, Loader2, Sparkles, LayoutGrid, CalendarDays, Moon, Sunset, Coffee, Bell, ListChecks, X, Trophy } from 'lucide-react';
 import { parseBrainDump } from '../services/geminiService';
 import { ProposalModal } from '../components/ProposalModal';
+import { useNavigate } from 'react-router-dom';
 
 export const LifeDashboard = () => {
   const { 
     habits, toggleHabit, deleteHabit, addHabit,
     schedule, addScheduleItem, updateScheduleItem, deleteScheduleItem, 
     weeklyGoals, addWeeklyGoal, updateWeeklyGoal, deleteWeeklyGoal,
-    applyAIProposal, xp 
+    applyAIProposal, xp, userApiKey 
   } = useApp();
+  const navigate = useNavigate();
   
   // View State
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
@@ -121,16 +122,24 @@ export const LifeDashboard = () => {
 
   const handleOrganizeLife = async () => {
       if (!brainDump.trim()) return;
+
+      if (!userApiKey) {
+        if(confirm("You need a Personal API Key to use AI features. Go to Settings?")) {
+            navigate('/app/settings');
+        }
+        return;
+      }
+
       setIsPlanning(true);
       const contextDate = dateKey; 
       try {
-        const result = await parseBrainDump(brainDump, contextDate);
+        const result = await parseBrainDump(brainDump, contextDate, userApiKey);
         if (result) {
             setProposal(result);
             setBrainDump('');
         }
       } catch (e) {
-          alert("AI Error. Try again.");
+          alert("AI Error. Check API Key.");
       } finally {
         setIsPlanning(false);
       }

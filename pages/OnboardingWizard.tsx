@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { parseBrainDump } from '../services/geminiService';
 import { Sparkles, ArrowRight, Loader2, FileText, HelpCircle, X } from 'lucide-react';
 
 export const OnboardingWizard = () => {
-  const { applyAIProposal, completeOnboarding } = useApp();
+  const { applyAIProposal, completeOnboarding, onboardingCompleted } = useApp();
   const navigate = useNavigate();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Guard: If already onboarded, redirect immediately.
+  useEffect(() => {
+      if (onboardingCompleted) {
+          navigate('/app');
+      }
+  }, [onboardingCompleted, navigate]);
 
   const handleFinish = async () => {
       if (!input.trim()) return;
@@ -30,10 +37,13 @@ export const OnboardingWizard = () => {
       `;
       
       try {
+          // NOTE: We do NOT pass userApiKey here. 
+          // This forces geminiService to use the Environment Variable (Platform Key) for onboarding.
           const proposal = await parseBrainDump(prompt, new Date().toISOString().split('T')[0]);
+          
           if (proposal) {
               applyAIProposal(proposal);
-              await completeOnboarding(); // Ensure DB is updated before navigating
+              await completeOnboarding(); 
               navigate('/app');
           } else {
               alert("Failed to generate plan. Please try again or add more detail.");
@@ -47,7 +57,6 @@ export const OnboardingWizard = () => {
   }
 
   const handleSkip = async () => {
-      // Mark onboarding as complete even if they skipped, so they aren't asked again.
       await completeOnboarding();
       navigate('/app');
   }
@@ -56,7 +65,6 @@ export const OnboardingWizard = () => {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-3xl bg-surface border border-border rounded-2xl p-8 shadow-2xl relative">
           
-          {/* Skip Button (Top Right) */}
           <button 
             onClick={handleSkip}
             className="absolute top-4 right-4 text-muted hover:text-white text-sm flex items-center gap-1 px-3 py-1 rounded hover:bg-white/5 transition-colors"

@@ -3,9 +3,10 @@ import { useApp } from '../context/AppContext';
 import { TaskStatus, ProjectCategory, ProjectStatus, Priority } from '../types';
 import { BookOpen, GraduationCap, Clock, Target, Library, CheckCircle2, Plus, ChevronRight, Bookmark, CalendarClock, AlertCircle, LayoutList } from 'lucide-react';
 import { generateDailyPlan } from '../services/geminiService';
+import { useNavigate } from 'react-router-dom';
 
 export const EducationDashboard = () => {
-  const { tasks, projects, goals, updateTask, addProject, addTask } = useApp();
+  const { tasks, projects, goals, updateTask, addProject, addTask, userApiKey } = useApp();
   const [dailyAdvice, setDailyAdvice] = useState<string>("");
   const [focusTaskIds, setFocusTaskIds] = useState<string[]>([]);
   const [isLoadingPlan, setIsLoadingPlan] = useState(false);
@@ -14,6 +15,7 @@ export const EducationDashboard = () => {
   const [isAddingAssignment, setIsAddingAssignment] = useState<string | null>(null); // Course ID
   const [newAssignmentTitle, setNewAssignmentTitle] = useState("");
   const [newAssignmentDate, setNewAssignmentDate] = useState("");
+  const navigate = useNavigate();
   
   // TABS STATE
   const [activeTab, setActiveTab] = useState<'courses' | 'assignments' | 'schedule'>('courses');
@@ -33,14 +35,25 @@ export const EducationDashboard = () => {
     .reduce((acc, t) => acc + (t.estimatedHours || 0), 0);
 
   const generatePlan = async () => {
-      setIsLoadingPlan(true);
-      const activeTasks = eduTasks.filter(t => t.status !== TaskStatus.Done);
-      const plan = await generateDailyPlan(activeTasks, eduGoals);
-      if (plan) {
-          setDailyAdvice(plan.advice);
-          setFocusTaskIds(plan.top3TaskIds);
+      if (!userApiKey) {
+          if(confirm("You need a Personal API Key to use AI features. Go to Settings?")) {
+            navigate('/app/settings');
+          }
+          return;
       }
-      setIsLoadingPlan(false);
+      setIsLoadingPlan(true);
+      try {
+        const activeTasks = eduTasks.filter(t => t.status !== TaskStatus.Done);
+        const plan = await generateDailyPlan(activeTasks, eduGoals, userApiKey);
+        if (plan) {
+            setDailyAdvice(plan.advice);
+            setFocusTaskIds(plan.top3TaskIds);
+        }
+      } catch(e) {
+          alert("Error generating plan.");
+      } finally {
+        setIsLoadingPlan(false);
+      }
   }
 
   const handleAddCourse = (e: React.FormEvent) => {

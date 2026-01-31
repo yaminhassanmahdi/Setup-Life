@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -27,7 +26,7 @@ export const AuthPage = () => {
             password,
             options: {
                 data: {
-                    // Force admin role in metadata if specific email (fallback for RLS)
+                    // CRITICAL: Store role in metadata for RLS policies
                     role: email === 'admin@gmail.com' ? 'admin' : 'user'
                 }
             }
@@ -40,22 +39,17 @@ export const AuthPage = () => {
         // LOGIN MODE
         const { data, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         
-        // Special logic for Admin Auto-Provisioning
+        // Special logic for Admin Auto-Provisioning (Dev Helper)
         if (signInError && email === 'admin@gmail.com' && signInError.message.includes("Invalid login credentials")) {
             console.log("Admin account not found. Auto-creating...");
-            // Attempt to sign up the admin
             const { error: signUpError } = await supabase.auth.signUp({
                 email,
                 password,
                 options: { data: { role: 'admin' } }
             });
             
-            if (signUpError) {
-                // If signup failed (e.g. rate limit, or maybe it actually exists but password wrong)
-                throw new Error("Could not auto-create admin. " + signUpError.message);
-            }
+            if (signUpError) throw new Error("Could not auto-create admin. " + signUpError.message);
             
-            // Success! Force reload to ensure AppProvider picks up the new session cleanly
             alert("Admin account created! You will be logged in now.");
             window.location.reload();
             return;

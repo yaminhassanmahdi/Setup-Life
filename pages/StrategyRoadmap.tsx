@@ -3,9 +3,11 @@ import { useApp } from '../context/AppContext';
 import { PlanHorizon, StrategicPlan, ProjectCategory } from '../types';
 import { breakdownPlan } from '../services/geminiService';
 import { Map, Plus, Target, CalendarDays, Loader2, Award, CheckCircle2, Trash2, ArrowRight, Briefcase, User, GraduationCap, LayoutGrid } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export const StrategyRoadmap = () => {
-    const { strategicPlans, addStrategicPlan, updateStrategicPlan, deleteStrategicPlan, weeklyGoals } = useApp();
+    const { strategicPlans, addStrategicPlan, updateStrategicPlan, deleteStrategicPlan, weeklyGoals, userApiKey } = useApp();
+    const navigate = useNavigate();
     
     // UI States
     const [activeCategory, setActiveCategory] = useState<'Master' | ProjectCategory>('Master');
@@ -34,6 +36,13 @@ export const StrategyRoadmap = () => {
     }
 
     const handleBreakdown = async (plan: StrategicPlan) => {
+        if (!userApiKey) {
+            if(confirm("You need a Personal API Key to use AI features. Go to Settings?")) {
+                navigate('/app/settings');
+            }
+            return;
+        }
+
         setIsBreakingDown(plan.id);
         const nextHorizon = getNextHorizon(plan.horizon);
         if(!nextHorizon) {
@@ -42,7 +51,7 @@ export const StrategyRoadmap = () => {
         }
 
         try {
-            const subTitles = await breakdownPlan(plan.title, plan.horizon);
+            const subTitles = await breakdownPlan(plan.title, plan.horizon, userApiKey);
             if (subTitles) {
                 subTitles.forEach(title => {
                     addStrategicPlan({
