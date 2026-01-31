@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Settings as SettingsIcon, LogIn, Cloud, RefreshCw, LogOut } from 'lucide-react';
+import { Settings as SettingsIcon, LogIn, Cloud, RefreshCw, LogOut, Trash2, AlertTriangle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../services/supabase';
 
 export const Settings = () => {
-  const { user, userRole, logout, syncLocalToRemote } = useApp();
+  const { user, userRole, logout, syncLocalToRemote, resetData } = useApp();
   
   // Auth State
   const [email, setEmail] = useState('');
@@ -36,7 +36,7 @@ export const Settings = () => {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto space-y-8">
+    <div className="p-8 max-w-4xl mx-auto space-y-8 h-full overflow-y-auto">
       <h1 className="text-3xl font-bold mb-6 flex items-center gap-2">
           <SettingsIcon className="text-muted" /> Settings
       </h1>
@@ -125,6 +125,23 @@ export const Settings = () => {
                   </form>
               </div>
           )}
+      </div>
+
+      {/* --- DANGER ZONE --- */}
+      <div className="bg-surface border border-red-900/30 rounded-xl p-6 max-w-2xl mt-8">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-red-500">
+                <AlertTriangle className="text-red-500" /> Danger Zone
+            </h2>
+            <p className="text-sm text-muted mb-4">
+                Resetting your account will permanently delete all projects, tasks, habits, and XP. 
+                This action cannot be undone.
+            </p>
+            <button 
+                onClick={resetData}
+                className="px-4 py-2 bg-red-900/10 hover:bg-red-900/30 text-red-500 border border-red-900/50 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+                <Trash2 size={16} /> Reset Everything
+            </button>
       </div>
     </div>
   );

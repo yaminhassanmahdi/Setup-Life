@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { AppState, Project, Goal, KPI, Task, Subtask, AIProposal, Habit, ProjectCategory, ScheduleItem, WeeklyGoal, TimeOfDay, TaskStatus, UserRole, StrategicPlan, Achievement } from '../types';
 import { supabase, mapProjectToDB, mapProjectFromDB, mapTaskToDB, mapTaskFromDB, mapSubtaskToDB, mapSubtaskFromDB, mapGoalToDB, mapGoalFromDB, mapKPIToDB, mapKPIFromDB, mapHabitToDB, mapHabitFromDB, mapScheduleToDB, mapScheduleFromDB, mapWeeklyGoalToDB, mapWeeklyGoalFromDB, mapStrategicPlanToDB, mapStrategicPlanFromDB, fetchProfileWithRetry } from '../services/supabase';
@@ -517,9 +516,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (user) await supabase.from('strategic_plans').delete().eq('id', id);
   }
 
-  const resetData = () => {
+  const resetData = async () => {
+    if (user) {
+         const confirmReset = window.confirm("⚠️ DANGER: This will PERMANENTLY DELETE all your cloud data (Projects, Tasks, XP, etc). This cannot be undone. Are you sure?");
+         if (!confirmReset) return;
+         
+         setIsLoading(true);
+         try {
+             // Deleting projects cascades to tasks, goals, kpis, subtasks via DB constraints
+             // Deleting other tables independently
+             await Promise.all([
+                supabase.from('projects').delete().eq('user_id', user.id), 
+                supabase.from('habits').delete().eq('user_id', user.id),
+                supabase.from('schedule').delete().eq('user_id', user.id),
+                supabase.from('weekly_goals').delete().eq('user_id', user.id),
+                supabase.from('strategic_plans').delete().eq('user_id', user.id),
+                // Reset Profile Stats
+                supabase.from('profiles').update({ xp: 0, onboarding_completed: false, unlocked_achievements: [] }).eq('id', user.id)
+             ]);
+         } catch(e) {
+             console.error(e);
+             alert("Failed to reset cloud data.");
+         } finally {
+             setIsLoading(false);
+         }
+    } else {
+         if (!window.confirm("Are you sure you want to clear all local data?")) return;
+    }
+
     setState(generateDefaults());
-  }
+    window.location.reload();
+  };
 
   const applyAIProposal = (proposal: AIProposal) => {
     // ... (No logic changes needed here for XP, as adding individual items calls the helpers)
